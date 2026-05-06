@@ -1,0 +1,611 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+    local Window = Rayfield:CreateWindow({
+   Name = "TYRANT AIMBOT🎯 SCRIPT",
+   Icon = 0, -- Icon in Topbar. Can use Lucide Icons (string) or Roblox Image (number). 0 to use no icon (default).
+   LoadingTitle = "TYRANTAIMBOT",
+   LoadingSubtitle = "TYRANT SCRIPTS.",
+   ShowText = "TYRANT SCRIPTS", -- for mobile users to unhide Rayfield, change if you'd like
+   Theme = "Default", -- Check https://docs.sirius.menu/rayfield/configuration/themes
+
+   ToggleUIKeybind = "K", -- The keybind to toggle the UI visibility (string like "K" or Enum.KeyCode)
+
+   DisableRayfieldPrompts = false,
+   DisableBuildWarnings = false, -- Prevents Rayfield from emitting warnings when the script has a version mismatch with the interface.
+
+   -- ScriptID = "sid_xxxxxxxxxxxx", -- Your Script ID from developer.sirius.menu — enables analytics, managed keys, and script hosting
+
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = nil, -- Create a custom folder for your hub/game
+      FileName = "gwapo"
+   },
+
+   Discord = {
+      Enabled = true, -- Prompt the user to join your Discord server if their executor supports it
+      Invite = "https://discord.gg/HDShYf49eH", -- The Discord invite code, do not include Discord.gg/. E.g. Discord.gg/ABCD would be ABCD
+      RememberJoins = true -- Set this to false to make them join the Discord every time they load it up
+   },
+
+   KeySystem = true, -- Set this to true to use our key system
+   KeySettings = {
+      Title = "Johannkey",
+      Subtitle = "Link In Discord Server",
+      Note = "Join Server From Misk Tab", -- Use this to tell the user how to get a key
+      FileName = "Pastebin Key", -- It is recommended to use something unique, as other scripts using Rayfield may overwrite your key file
+      SaveKey = false, -- The user's key will be saved, but if you change the key, they will be unable to use your script
+      GrabKeyFromSite = true, -- If this is true, set Key below to the RAW site you would like Rayfield to get the key from
+      Key = {"https://pastebin.com/raw/bDvKuZ1E"} -- List of keys that the system will accept, can be RAW file links (pastebin, github, etc.) or simple strings ("hello", "key22")
+   }
+})
+    
+    local MainTab = Window:CreateTab("🏠 Home", nil) -- Title, Image
+    local MainSection = MainTab:CreateSection("Main")
+
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+
+local xrayEnabled = false
+local fillTransparency = 0.5 -- body transparency
+local outlineTransparency = 0 -- outline visibility
+
+-- apply highlight
+local function applyHighlight(char)
+	if char:FindFirstChild("XrayHighlight") then return end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "XrayHighlight"
+	highlight.FillColor = Color3.fromRGB(255, 0, 0)
+	highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+
+	highlight.FillTransparency = fillTransparency
+	highlight.OutlineTransparency = outlineTransparency
+
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- 👁️ THROUGH WALLS
+	highlight.Parent = char
+end
+
+-- remove highlight
+local function removeHighlight(char)
+	local h = char:FindFirstChild("XrayHighlight")
+	if h then
+		h:Destroy()
+	end
+end
+
+-- update all players
+local function updateAll()
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr ~= player and plr.Character then
+			if xrayEnabled then
+				applyHighlight(plr.Character)
+			else
+				removeHighlight(plr.Character)
+			end
+		end
+	end
+end
+
+-- respawn support
+Players.PlayerAdded:Connect(function(plr)
+	plr.CharacterAdded:Connect(function(char)
+		if xrayEnabled then
+			task.wait(1)
+			applyHighlight(char)
+		end
+	end)
+end)
+
+for _, plr in pairs(Players:GetPlayers()) do
+	plr.CharacterAdded:Connect(function(char)
+		if xrayEnabled then
+			task.wait(1)
+			applyHighlight(char)
+		end
+	end)
+end
+
+-- 🔘 Toggle
+MainTab:CreateToggle({
+	Name = "X-Ray (Through Walls)",
+	CurrentValue = false,
+	Callback = function(v)
+		xrayEnabled = v
+		updateAll()
+	end,
+})
+
+-- 🎚️ Transparency Slider
+MainTab:CreateSlider({
+	Name = "X-Ray Fill Transparency",
+	Range = {0, 100},
+	Increment = 5,
+	CurrentValue = 50,
+	Callback = function(v)
+		fillTransparency = v / 100
+
+		-- update existing highlights
+		for _, plr in pairs(Players:GetPlayers()) do
+			if plr.Character then
+				local h = plr.Character:FindFirstChild("XrayHighlight")
+				if h then
+					h.FillTransparency = fillTransparency
+				end
+			end
+		end
+	end,
+})
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+-- SETTINGS
+local aimEnabled = false
+local size = 80
+local assistStrength = 0.20
+local targetMode = "Closest" -- or "Farthest"
+
+-- UI (center-fixed)
+local gui = Instance.new("ScreenGui")
+gui.Name = "CrosshairUI"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local crosshair = Instance.new("Frame")
+crosshair.Parent = gui
+crosshair.AnchorPoint = Vector2.new(0.5, 0.5)
+crosshair.Position = UDim2.fromScale(0.5, 0.5)
+crosshair.Size = UDim2.new(0, size, 0, size)
+crosshair.BackgroundTransparency = 1
+crosshair.Visible = false
+
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(0,255,0)
+stroke.Thickness = 2
+stroke.Parent = crosshair
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(1,0)
+corner.Parent = crosshair
+
+-- MAIN TAB UI
+MainTab:CreateToggle({
+	Name = "Aim Assist",
+	CurrentValue = false,
+	Callback = function(v)
+		aimEnabled = v
+		crosshair.Visible = v
+	end,
+})
+
+MainTab:CreateSlider({
+	Name = "Crosshair Size",
+	Range = {20, 300},
+	Increment = 5,
+	CurrentValue = 100,
+	Callback = function(v)
+		size = v
+		crosshair.Size = UDim2.new(0, size, 0, size)
+	end,
+})
+
+MainTab:CreateSlider({
+	Name = "Aim Strength",
+	Range = {1, 100},
+	Increment = 1,
+	CurrentValue = 15,
+	Callback = function(v)
+		assistStrength = v / 100
+	end,
+})
+
+MainTab:CreateDropdown({
+	Name = "Target Mode",
+	Options = {"Closest", "Farthest"},
+	CurrentOption = "Closest",
+	Callback = function(opt)
+		targetMode = opt
+	end,
+})
+
+-- TARGET FUNCTION (inside crosshair)
+local function getTarget()
+	local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
+	local best = nil
+	local bestScore = (targetMode == "Closest") and math.huge or -math.huge
+
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+			local hrp = plr.Character.HumanoidRootPart
+			local pos, visible = camera:WorldToViewportPoint(hrp.Position)
+
+			if visible then
+				local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+
+				if dist <= size then
+					if targetMode == "Closest" then
+						if dist < bestScore then
+							bestScore = dist
+							best = hrp
+						end
+					else
+						if dist > bestScore then
+							bestScore = dist
+							best = hrp
+						end
+					end
+				end
+			end
+		end
+	end
+
+	return best
+end
+
+-- LOOP
+RunService.RenderStepped:Connect(function()
+	if not aimEnabled then
+		stroke.Color = Color3.fromRGB(0,255,0)
+		return
+	end
+
+	local target = getTarget()
+
+	if target then
+		stroke.Color = Color3.fromRGB(255,0,0)
+
+		local bodyPos = target.Position + Vector3.new(0, 1.5, 0)
+		local desired = CFrame.new(camera.CFrame.Position, bodyPos)
+
+		camera.CFrame = camera.CFrame:Lerp(desired, assistStrength)
+	else
+		stroke.Color = Color3.fromRGB(0,255,0)
+	end
+end)
+
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+local invisEnabled = false
+local transparency = 0.7 -- how transparent YOU see yourself
+
+local function setLocalTransparency(char, value)
+	for _, obj in pairs(char:GetDescendants()) do
+		if obj:IsA("BasePart") then
+			obj.LocalTransparencyModifier = value
+		end
+	end
+end
+
+local DiscordTab = Window:CreateTab("🔵 Discord", nil)
+
+DiscordTab:CreateParagraph({
+	Title = "Join our Discord",
+	Content = "Click the button below to copy the invite link!"
+})
+
+DiscordTab:CreateButton({
+	Name = "Copy Discord Invite",
+	Callback = function()
+		setclipboard("https://discord.gg/HDShYf49eH")
+	end,
+})
+
+local OthersTab = Window:CreateTab("Others", 4483362458)
+
+local defaultSpeed = 16
+local speedEnabled = false
+local speedValue = 16
+
+local function applySpeed()
+	local char = player.Character
+	if not char then return end
+
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if hum then
+		hum.WalkSpeed = speedEnabled and speedValue or defaultSpeed
+	end
+end
+
+-- TOGGLE
+OthersTab:CreateToggle({
+	Name = "WalkSpeed",
+	CurrentValue = false,
+	Callback = function(v)
+		speedEnabled = v
+		applySpeed()
+	end,
+})
+
+-- SLIDER
+OthersTab:CreateSlider({
+	Name = "Speed",
+	Range = {16, 300},
+	Increment = 1,
+	CurrentValue = 16,
+	Callback = function(v)
+		speedValue = v
+		applySpeed()
+	end,
+})
+
+-- IMPORTANT: wait for full character load
+player.CharacterAdded:Connect(function(char)
+	char:WaitForChild("Humanoid") -- ensures humanoid exists
+	task.wait(0.2) -- small delay for Roblox reset timing
+	applySpeed()
+end)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+
+local flying = false
+local flySpeed = 50
+
+local bodyVelocity
+local bodyGyro
+
+local function startFly()
+	local char = player.Character
+	if not char then return end
+
+	local hrp = char:WaitForChild("HumanoidRootPart")
+
+	bodyVelocity = Instance.new("BodyVelocity")
+	bodyVelocity.MaxForce = Vector3.new(1,1,1) * math.huge
+	bodyVelocity.Velocity = Vector3.zero
+	bodyVelocity.Parent = hrp
+
+	bodyGyro = Instance.new("BodyGyro")
+	bodyGyro.MaxTorque = Vector3.new(1,1,1) * math.huge
+	bodyGyro.CFrame = hrp.CFrame
+	bodyGyro.Parent = hrp
+end
+
+local function stopFly()
+	if bodyVelocity then bodyVelocity:Destroy() end
+	if bodyGyro then bodyGyro:Destroy() end
+	bodyVelocity = nil
+	bodyGyro = nil
+end
+
+OthersTab:CreateToggle({
+	Name = "Fly",
+	CurrentValue = false,
+	Callback = function(v)
+		flying = v
+
+		if flying then
+			startFly()
+		else
+			stopFly()
+		end
+	end,
+})
+
+OthersTab:CreateSlider({
+	Name = "Fly Speed",
+	Range = {10, 300},
+	Increment = 5,
+	CurrentValue = 50,
+	Callback = function(v)
+		flySpeed = v
+	end,
+})
+
+RunService.RenderStepped:Connect(function()
+	if not flying or not bodyVelocity or not bodyGyro then return end
+
+	local char = player.Character
+	if not char then return end
+
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	local cam = workspace.CurrentCamera
+	local move = Vector3.zero
+
+	if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+		move += cam.CFrame.LookVector
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+		move -= cam.CFrame.LookVector
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+		move -= cam.CFrame.RightVector
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+		move += cam.CFrame.RightVector
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+		move += Vector3.new(0,1,0)
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+		move -= Vector3.new(0,1,0)
+	end
+
+	if move.Magnitude > 0 then
+		bodyVelocity.Velocity = move.Unit * flySpeed
+	else
+		bodyVelocity.Velocity = Vector3.zero
+	end
+
+	bodyGyro.CFrame = cam.CFrame
+end)
+
+player.CharacterAdded:Connect(function()
+	task.wait(0.5)
+	if flying then
+		startFly()
+	end
+end)
+
+local noclip = false
+
+-- TOGGLE
+OthersTab:CreateToggle({
+	Name = "Noclip",
+	CurrentValue = false,
+	Callback = function(v)
+		noclip = v
+	end,
+})
+
+-- MAIN LOOP
+RunService.Stepped:Connect(function()
+	if not noclip then return end
+
+	local char = player.Character
+	if not char then return end
+
+	for _, part in pairs(char:GetDescendants()) do
+		if part:IsA("BasePart") then
+			part.CanCollide = false
+		end
+	end
+end)
+
+-- RESPAWN FIX
+player.CharacterAdded:Connect(function(char)
+	task.wait(0.2)
+	if noclip then
+		for _, part in pairs(char:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.CanCollide = false
+			end
+		end
+	end
+end)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+local HitboxSettings = {
+    Size = 2,
+    Enabled = false,
+    Transparency = 0.7
+}
+
+MainTab:CreateToggle({
+    Name = "Enable Hitbox Expander",
+    CurrentValue = false,
+    Flag = "HitboxEnabled",
+    Callback = function(Value)
+        HitboxSettings.Enabled = Value
+        if not Value then
+            -- Immediate reset when toggled off
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer then
+                    pcall(function()
+                        local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            hrp.Size = Vector3.new(2, 2, 1)
+                            hrp.Transparency = 1
+                            hrp.BrickColor = BrickColor.new("Medium stone grey")
+                            hrp.Material = Enum.Material.Plastic
+                            hrp.CanCollide = true
+                        end
+                    end)
+                end
+            end
+        end
+    end,
+})
+
+MainTab:CreateSlider({
+    Name = "Hitbox Size",
+    Range = {2, 50},
+    Increment = 1,
+    Suffix = "Studs",
+    CurrentValue = 2,
+    Flag = "HitboxSize",
+    Callback = function(Value)
+        HitboxSettings.Size = Value
+    end,
+})
+
+MainTab:CreateSlider({
+    Name = "Hitbox Transparency",
+    Range = {0, 100},
+    Increment = 1,
+    Suffix = "%",
+    CurrentValue = 70,
+    Flag = "HitboxTransparency",
+    Callback = function(Value)
+        HitboxSettings.Transparency = Value / 100
+    end,
+})
+
+-- High-speed logic loop using RenderStepped for "Instant" updates
+RunService.RenderStepped:Connect(function()
+    if HitboxSettings.Enabled then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                pcall(function()
+                    local character = player.Character
+                    if character and character:FindFirstChild("HumanoidRootPart") then
+                        local hrp = character.HumanoidRootPart
+                        hrp.Size = Vector3.new(HitboxSettings.Size, HitboxSettings.Size, HitboxSettings.Size)
+                        hrp.Transparency = HitboxSettings.Transparency
+                        hrp.BrickColor = BrickColor.new("Really red")
+                        hrp.Material = Enum.Material.Neon
+                        hrp.CanCollide = false
+                    end
+                end)
+            end
+        end
+    end
+end)
+
+--[[
+    ================================================================
+    [ SCRIPT INFORMATION ]
+    Project: Custom Script
+    Author: OYB
+    YouTube: https://www.youtube.com/channel/UCAlXXV1Hbvf7WbfXARuVtiQ
+    
+    [ TERMS AND CONDITIONS ]
+    - You ARE allowed to use and modify this script for your own games.
+    - You ARE NOT allowed to re-upload, redistribute, or claim 
+      ownership of this script.
+    - Removing or altering these credits is strictly prohibited.
+    
+    Copyright (c) 2026 OYB. All rights reserved.
+    ================================================================
+]]
+
+-- ⚠️ IMPORTANT: Put this code at the VERY TOP of your Main Script (before obfuscating) ⚠️
+
+local ProtectionConfig = {
+    -- 🔴 CRITICAL: This MUST exactly match the 'Secret' value in your Key System's Config!
+    -- If your Key System has: Secret = "Test"
+    -- Then this must also be: SecretKey = "Test"
+    SecretKey = "Johann111",
+    
+    -- The name of your Hub (shown in the kick message if they try to bypass)
+    HubName = "TYRANT HUB"
+}
+
+-- Anti-Bypass Logic: Checks if the Key System successfully set the global variable
+if not _G[ProtectionConfig.SecretKey] then
+    local player = game:GetService("Players").LocalPlayer
+    if player then
+        player:Kick("\n🛡️ Unauthorized Execution 🛡️\n\nPlease use the official Key System to run " .. ProtectionConfig.HubName)
+    end
+    return -- Stops the rest of the script from loading!
+end
+
+-------------------------------------------------------------------------------
+-- 👇 YOUR MAIN SCRIPT CODE STARTS HERE 👇
+-------------------------------------------------------------------------------
+
+print(ProtectionConfig.HubName .. " Loaded Successfully!")
